@@ -1,0 +1,74 @@
+ODIN Union
+
+# product of ODIN codesprint at CERN, 15-16 2013
+# creators: Stefano Bortoli, Jan Dvorak, Alejandra Gonzalez-Beltran & Todd Vision
+
+# Narrative description of steps current as of 15 Oct 2013 17:50, w/ code samples
+
+# Step 1. Getting the data from DataCite
+# http://search.datacite.org/api?q=nameIdentifier%3AORCID\%3A*&fl=doi,nameIdentifier,xml&fq=is_active:true&fq=has_metadata:true&wt=csv&rows=100000 
+# in this directory as datacite1.csv
+# the third column contains base64-encoded XML
+
+#recover that XML:
+mkdir data1
+sed -e 1d -e 's/.*,//g' datacite1.csv | while read X ; do XX=`echo $X | shasum | awk '{print $1}'` ; echo $X | base64 -D >data1/$XX.xml ; echo $XX ; done
+
+# Step 2. Convert DataCite XML to csv w/ custom xlst script
+# process it to extract creators/contributors with ORCIDs
+# runs isolate.xslt on all the files from data1/, making *.txt files in data2/
+mkdir data2
+ant
+
+# build.xml is:
+<project name="ODIN codesprint DataCite ORCID harmonization" default="xml-to-text-1">
+  <target name="xml-to-text-1">
+    <xslt style="isolate.xslt" basedir="data1" destdir="data2" extension=".txt"/>
+  </target>
+</project>
+
+# isolate.xslt
+<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="2.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+    <xsl:output method="text" encoding="UTF-8"/>
+    <xsl:template match="/">
+        <xsl:for-each select="*[local-name()='resource']/*[local-name()='creators']/*[local-name()='creator' and *[local-name()='nameIdentifier']/@nameIdentifierScheme='ORCID']">
+            <xsl:value-of select="*[local-name()='nameIdentifier' and @nameIdentifierScheme='ORCID']"/>
+            <xsl:text>; </xsl:text>
+            <xsl:value-of select="*[local-name()='creatorName']"/>
+            <xsl:text>; </xsl:text>
+            <xsl:value-of select="/*[local-name()='resource']/*[local-name()='identifier' and @identifierType='DOI']"/>
+            <xsl:text>
+</xsl:text>
+        </xsl:for-each>
+        <xsl:for-each select="*[local-name()='resource']/*[local-name()='contributors']/*[local-name()='contributor' and *[local-name()='nameIdentifier']/@nameIdentifierScheme='ORCID']">
+            <xsl:value-of select="*[local-name()='nameIdentifier' and @nameIdentifierScheme='ORCID']"/>
+            <xsl:text>; </xsl:text>
+            <xsl:value-of select="*[local-name()='contributorName']"/>
+            <xsl:text>; </xsl:text>
+            <xsl:value-of select="/*[local-name()='resource']/*[local-name()='identifier' and @identifierType='DOI']"/>
+            <xsl:text>
+</xsl:text>
+        </xsl:for-each>
+    </xsl:template>
+
+</xsl:stylesheet>
+
+# step 3 Merge the files
+cd data2
+ls | xargs -n 1000 cat | sort >../data2.csv
+# note that rwo lines at the beginning and several lines at the end of the file are junk row due to messy data
+
+# Step 4. Extract creators, contributors, and any associated ORCIDs for them, with OpenRefine
+# see attached OpenRefine files
+
+# Step 5. Download CrossRef records with ORCIDs
+# Search for specific ORCID, retrieving DOIs with any relationship to the ORCID given:
+# http://search.crossref.org/dois?q=xxxx-xxxx-xxxx-xxxx (substitute specific ORCID for x)
+
+# Step 6. Retrieve XML for each CrossRef DOI 
+# No API key required, but queries may be throttled
+# e.g. http://api.labs.crossref.org/doi:10.1890/12-2231.1.xml
+
+# Step 7. Getting Data dump from ORCID
+# URL masked
